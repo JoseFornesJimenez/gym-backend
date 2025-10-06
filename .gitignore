@@ -71,7 +71,8 @@ dist
 
 # Gatsby files
 .cache/
-public
+# Solo ignorar imágenes del public, no el panel
+public/images/
 
 # Storybook build outputs
 .out
