@@ -1209,3 +1209,19 @@ body {
 .error {
     color: #e74c3c;
 }
+
+.text-danger {
+    color: #e74c3c !important;
+}
+
+/* Animación para loading */
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.loading-spinner {
+    display: inline-block;
+    margin-right: 8px;
+    animation: spin 1s linear infinite;
+}

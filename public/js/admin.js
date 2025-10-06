@@ -584,6 +584,30 @@ function hideLoading() {
     document.getElementById('loading-overlay').classList.remove('show');
 }
 
+function showTableLoading(tableBodyId) {
+    const tbody = document.getElementById(tableBodyId);
+    if (tbody) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="7" class="text-center" style="padding: 40px;">
+                    <div>
+                        <i class="fas fa-spinner loading-spinner"></i>
+                        <strong>Cargando datos de logros...</strong>
+                    </div>
+                    <small class="text-muted">Esto puede tomar unos segundos</small>
+                </td>
+            </tr>
+        `;
+    }
+}
+
+function showError(tableBodyId, message) {
+    const tbody = document.getElementById(tableBodyId);
+    if (tbody) {
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center text-danger">❌ ${message}</td></tr>`;
+    }
+}
+
 function showAlert(message, type = 'info') {
     // Crear elemento de alerta
     const alert = document.createElement('div');
@@ -1009,59 +1033,107 @@ let currentAchievements = [];
 
 // Cargar datos de logros
 async function loadAchievementData() {
+    console.log('🏆 Iniciando carga de datos de logros...');
+    
     try {
-        showLoading('achievements-tbody');
+        showTableLoading('achievements-tbody');
         
-        // Cargar usuarios y sus datos de logros
+        // Cargar usuarios básicos primero
+        console.log('📡 Solicitando usuarios a:', `${API_BASE_URL}/admin/users`);
+        
         const usersResponse = await fetch(`${API_BASE_URL}/admin/users`);
+        console.log('📡 Status respuesta usuarios:', usersResponse.status);
+        
+        if (!usersResponse.ok) {
+            throw new Error(`Error HTTP ${usersResponse.status}: ${usersResponse.statusText}`);
+        }
+        
         const usersData = await usersResponse.json();
+        console.log('👥 Datos de usuarios recibidos:', usersData);
         
         if (!usersData.success) {
-            throw new Error(usersData.error || 'Error cargando usuarios');
+            throw new Error(usersData.error || 'Respuesta de API sin éxito');
         }
         
-        const users = usersData.users;
-        const achievementData = [];
+        const users = usersData.users || [];
+        console.log('👤 Procesando', users.length, 'usuarios');
         
-        // Para cada usuario, obtener su información de logros
-        for (const user of users) {
-            try {
-                // Obtener workouts del usuario
-                const workoutsResponse = await fetch(`${API_BASE_URL}/workouts/user/${user.id}`);
-                const workoutsData = workoutsResponse.ok ? await workoutsResponse.json() : { workouts: [] };
-                
-                // Obtener estado de reset de logros
-                const resetResponse = await fetch(`${API_BASE_URL}/users/${user.id}/achievements-reset-status`);
-                const resetData = resetResponse.ok ? await resetResponse.json() : { hasReset: false };
-                
-                achievementData.push({
-                    ...user,
-                    totalWorkouts: workoutsData.workouts?.length || 0,
-                    achievementsCount: 0, // Esto se calculará client-side
-                    lastReset: resetData.hasReset ? resetData.resetDate : null,
-                    hasBeenReset: resetData.hasReset
-                });
-                
-            } catch (error) {
-                console.error(`Error cargando datos para usuario ${user.id}:`, error);
-                achievementData.push({
-                    ...user,
-                    totalWorkouts: 0,
-                    achievementsCount: 0,
-                    lastReset: null,
-                    hasBeenReset: false
-                });
-            }
+        if (users.length === 0) {
+            const tbody = document.getElementById('achievements-tbody');
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center">No hay usuarios registrados</td></tr>';
+            updateAchievementStats();
+            return;
         }
         
+        // Procesar usuarios con datos simplificados para evitar timeouts
+        const achievementData = users.map((user, index) => {
+            console.log(`� Procesando usuario ${index + 1}: ${user.username || user.name || 'Sin nombre'}`);
+            
+            return {
+                id: user.id,
+                username: user.username || user.name || 'Sin username',
+                email: user.email || 'Sin email',
+                name: user.name || user.username || 'Sin nombre',
+                totalWorkouts: 0, // Se cargará asíncronamente
+                achievementsCount: 0, // Se cargará asíncronamente  
+                lastReset: null,
+                hasBeenReset: false,
+                is_active: user.is_active
+            };
+        });
+        
+        console.log('✅ Datos básicos procesados, renderizando tabla...');
         currentAchievements = achievementData;
         renderAchievements();
         updateAchievementStats();
         
+        // Cargar datos adicionales de forma asíncrona
+        loadAdditionalAchievementData(achievementData);
+        
     } catch (error) {
-        console.error('Error cargando datos de logros:', error);
-        showError('achievements-tbody', 'Error cargando datos de logros');
+        console.error('❌ Error en loadAchievementData:', error);
+        showError('achievements-tbody', `Error: ${error.message}`);
     }
+}
+
+// Cargar datos adicionales de logros de forma asíncrona
+async function loadAdditionalAchievementData(users) {
+    console.log('🔄 Cargando datos adicionales de logros...');
+    
+    for (let i = 0; i < users.length; i++) {
+        const user = users[i];
+        
+        try {
+            // Cargar workouts
+            const workoutsResponse = await fetch(`${API_BASE_URL}/workouts/user/${user.id}`);
+            if (workoutsResponse.ok) {
+                const workoutsData = await workoutsResponse.json(); 
+                user.totalWorkouts = workoutsData.workouts?.length || 0;
+            }
+            
+            // Cargar reset status
+            const resetResponse = await fetch(`${API_BASE_URL}/users/${user.id}/achievements-reset-status`);
+            if (resetResponse.ok) {
+                const resetData = await resetResponse.json();
+                user.lastReset = resetData.hasReset ? resetData.resetDate : null;
+                user.hasBeenReset = resetData.hasReset;
+            }
+            
+            // Simular logros desbloqueados basado en workouts
+            user.achievementsCount = Math.min(Math.floor(user.totalWorkouts / 2), 10);
+            
+        } catch (error) {
+            console.error(`❌ Error cargando datos adicionales para ${user.username}:`, error);
+        }
+        
+        // Actualizar la fila específica en la tabla cada pocos usuarios
+        if ((i + 1) % 3 === 0 || i === users.length - 1) {
+            renderAchievements();
+            updateAchievementStats();
+        }
+    }
+    
+    console.log('✅ Carga adicional completada');
 }
 
 // Renderizar tabla de logros
