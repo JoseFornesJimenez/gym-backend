@@ -21,6 +21,9 @@
                 <li class="nav-item" data-section="users">
                     <a href="#"><i class="fas fa-users"></i> Usuarios</a>
                 </li>
+                <li class="nav-item" data-section="achievements">
+                    <a href="#"><i class="fas fa-trophy"></i> Logros</a>
+                </li>
                 <li class="nav-item" data-section="exercises">
                     <a href="#"><i class="fas fa-dumbbell"></i> Ejercicios</a>
                 </li>
@@ -126,6 +129,73 @@
                             <!-- Users will be loaded here -->
                         </tbody>
                     </table>
+                </div>
+            </section>
+
+            <!-- Achievements Section -->
+            <section id="achievements-section" class="content-section">
+                <div class="section-header">
+                    <h2>Gestión de Logros</h2>
+                    <div class="header-actions">
+                        <button class="btn btn-secondary" onclick="refreshAchievements()">
+                            <i class="fas fa-sync"></i> Actualizar
+                        </button>
+                    </div>
+                </div>
+
+                <div class="search-bar">
+                    <input type="text" id="achievement-search" placeholder="Buscar usuarios..." onkeyup="filterAchievements()">
+                    <i class="fas fa-search"></i>
+                </div>
+
+                <div class="table-container">
+                    <table class="data-table" id="achievements-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Usuario</th>
+                                <th>Email</th>
+                                <th>Entrenamientos</th>
+                                <th>Logros Desbloqueados</th>
+                                <th>Último Reset</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="achievements-tbody">
+                            <!-- Achievement data will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Achievement Stats Cards -->
+                <div class="stats-container">
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-trophy"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3 id="total-achievements">0</h3>
+                            <p>Total Logros Disponibles</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3 id="active-users">0</h3>
+                            <p>Usuarios con Logros</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-redo"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3 id="reset-count">0</h3>
+                            <p>Resets Realizados</p>
+                        </div>
+                    </div>
                 </div>
             </section>
 
@@ -278,6 +348,51 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" onclick="closeResetPasswordModal()">Cancelar</button>
                 <button type="button" class="btn btn-danger" onclick="resetUserPassword()">Reiniciar Contraseña</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- User Achievements Modal -->
+    <div id="achievements-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="achievements-modal-title">Logros del Usuario</h3>
+                <span class="close" onclick="closeModal('achievements-modal')">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div id="achievements-modal-content">
+                    <div class="achievement-stats">
+                        <div class="stat-row">
+                            <span class="stat-label">Total de Entrenamientos:</span>
+                            <span class="stat-value" id="modal-total-workouts">0</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-label">Logros Desbloqueados:</span>
+                            <span class="stat-value" id="modal-unlocked-achievements">0</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-label">Puntos Totales:</span>
+                            <span class="stat-value" id="modal-total-points">0</span>
+                        </div>
+                        <div class="stat-row">
+                            <span class="stat-label">Último Reset:</span>
+                            <span class="stat-value" id="modal-last-reset">Nunca</span>
+                        </div>
+                    </div>
+                    
+                    <div class="achievements-list">
+                        <h4>Lista de Logros:</h4>
+                        <div id="modal-achievements-list">
+                            <!-- Se llenará dinámicamente -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-warning" onclick="resetUserAchievementsFromModal()">
+                    <i class="fas fa-redo"></i> Reiniciar Logros
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="closeModal('achievements-modal')">Cerrar</button>
             </div>
         </div>
     </div>
