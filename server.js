@@ -2505,6 +2505,375 @@ app.post('/api/machine-grip-relations', async (req, res) => {
   }
 });
 
+// ============= ENDPOINTS PARA GRUPOS MUSCULARES =============
+
+// Obtener todos los grupos musculares disponibles
+app.get('/api/muscle-groups', (req, res) => {
+  try {
+    const muscleGroups = [
+      { id: 'biceps', name: 'Bíceps', description: 'Músculos del brazo anterior - flexores del codo' },
+      { id: 'triceps', name: 'Tríceps', description: 'Músculos del brazo posterior - extensores del codo' },
+      { id: 'culo', name: 'Culo', description: 'Músculos glúteos - extensores de cadera' },
+      { id: 'pecho', name: 'Pecho', description: 'Músculos pectorales' },
+      { id: 'espalda', name: 'Espalda', description: 'Músculos dorsales y romboides' },
+      { id: 'hombros', name: 'Hombros', description: 'Músculos deltoides' },
+      { id: 'piernas', name: 'Piernas', description: 'Músculos del tren inferior' },
+      { id: 'core', name: 'Core', description: 'Músculos abdominales y estabilizadores' }
+    ];
+
+    // Agregar contador de máquinas para cada grupo
+    const metadata = readMetadata();
+    const exercisesWithGroups = muscleGroups.map(group => {
+      const machinesInGroup = Object.values(metadata).filter(meta => 
+        meta.muscleGroup && meta.muscleGroup.includes(group.id)
+      ).length;
+      
+      return {
+        ...group,
+        machine_count: machinesInGroup
+      };
+    });
+
+    res.json({
+      success: true,
+      data: exercisesWithGroups
+    });
+  } catch (error) {
+    console.error('Error getting muscle groups:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error al obtener grupos musculares'
+    });
+  }
+});
+
+// Obtener máquinas por grupo muscular
+app.get('/api/muscle-groups/:id/machines', (req, res) => {
+  try {
+    const { id } = req.params;
+    const metadata = readMetadata();
+    
+    const machinesInGroup = Object.entries(metadata)
+      .filter(([filename, meta]) => {
+        return meta.muscleGroup && meta.muscleGroup.includes(id);
+      })
+      .map(([filename, meta]) => ({
+        id: path.parse(filename).name,
+        name: meta.name,
+        filename: filename,
+        image_url: `http://${SERVER_IP}:${PORT}/images/${filename}`,
+        is_primary: meta.isPrimary || false,
+        muscle_groups: meta.muscleGroup || [],
+        type: meta.type || 'machine'
+      }));
+
+    res.json({
+      success: true,
+      data: machinesInGroup
+    });
+  } catch (error) {
+    console.error('Error getting machines for muscle group:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error al obtener máquinas del grupo muscular'
+    });
+  }
+});
+
+// Actualizar grupos musculares de una máquina
+app.put('/api/exercises/:id/muscle-groups', (req, res) => {
+  try {
+    const { id } = req.params;
+    const { muscleGroups, isPrimary } = req.body;
+    
+    const metadata = readMetadata();
+    
+    // Buscar la máquina por ID
+    const machineFile = Object.keys(metadata).find(filename => 
+      path.parse(filename).name === id
+    );
+    
+    if (!machineFile) {
+      return res.status(404).json({
+        success: false,
+        error: 'Máquina no encontrada'
+      });
+    }
+    
+    // Actualizar metadata
+    metadata[machineFile] = {
+      ...metadata[machineFile],
+      muscleGroup: muscleGroups || [],
+      isPrimary: isPrimary || false,
+      lastModified: new Date().toISOString()
+    };
+    
+    const saved = writeMetadata(metadata);
+    
+    console.log(`🏋️ Grupos musculares actualizados para ${machineFile}:`, {
+      muscleGroups,
+      isPrimary
+    });
+    
+    res.json({
+      success: true,
+      message: 'Grupos musculares actualizados',
+      data: {
+        id: id,
+        filename: machineFile,
+        muscleGroups: muscleGroups,
+        isPrimary: isPrimary,
+        saved: saved
+      }
+    });
+  } catch (error) {
+    console.error('Error updating muscle groups:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error al actualizar grupos musculares'
+    });
+  }
+});
+
+// ============= ENDPOINTS MEJORADOS PARA EDICIÓN DE MÁQUINAS =============
+
+// Obtener información completa de una máquina para edición
+app.get('/api/exercises/:id/complete', (req, res) => {
+  try {
+    const { id } = req.params;
+    const metadata = readMetadata();
+    
+    // Buscar la máquina por ID
+    const machineFile = Object.keys(metadata).find(filename => 
+      path.parse(filename).name === id
+    );
+    
+    if (!machineFile) {
+      return res.status(404).json({
+        success: false,
+        error: 'Máquina no encontrada'
+      });
+    }
+    
+    const machineMeta = metadata[machineFile];
+    
+    // Obtener tipos de agarre asociados
+    const gripTypes = Object.entries(metadata)
+      .filter(([filename, meta]) => 
+        meta.type === 'grip' && meta.machineFor === id
+      )
+      .map(([filename, meta]) => ({
+        id: path.parse(filename).name,
+        name: meta.name,
+        filename: filename,
+        image_url: `http://${SERVER_IP}:${PORT}/images/${filename}`
+      }));
+    
+    const machineInfo = {
+      id: id,
+      name: machineMeta.name,
+      filename: machineFile,
+      image_url: `http://${SERVER_IP}:${PORT}/images/${machineFile}`,
+      type: machineMeta.type || 'machine',
+      muscleGroups: machineMeta.muscleGroup || [],
+      isPrimary: machineMeta.isPrimary || false,
+      description: machineMeta.description || '',
+      gripTypes: gripTypes,
+      uploadDate: machineMeta.uploadDate,
+      lastModified: machineMeta.lastModified
+    };
+    
+    res.json({
+      success: true,
+      data: machineInfo
+    });
+  } catch (error) {
+    console.error('Error getting complete machine info:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error al obtener información completa de la máquina'
+    });
+  }
+});
+
+// Actualizar información completa de una máquina
+app.put('/api/exercises/:id/complete', upload.single('image'), (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, description, muscleGroups, isPrimary } = req.body;
+    
+    const metadata = readMetadata();
+    
+    // Buscar la máquina por ID
+    let machineFile = Object.keys(metadata).find(filename => 
+      path.parse(filename).name === id
+    );
+    
+    if (!machineFile) {
+      return res.status(404).json({
+        success: false,
+        error: 'Máquina no encontrada'
+      });
+    }
+    
+    const currentMeta = metadata[machineFile];
+    let newFilename = machineFile;
+    
+    // Si se subió una nueva imagen, manejar el reemplazo
+    if (req.file) {
+      // Eliminar imagen anterior
+      const oldFilePath = path.join(uploadsDir, machineFile);
+      if (fs.existsSync(oldFilePath)) {
+        fs.unlinkSync(oldFilePath);
+      }
+      
+      newFilename = req.file.filename;
+      // Eliminar metadata antigua
+      delete metadata[machineFile];
+    }
+    
+    // Actualizar metadata con nueva información
+    metadata[newFilename] = {
+      ...currentMeta,
+      name: name || currentMeta.name,
+      description: description || currentMeta.description,
+      muscleGroup: typeof muscleGroups === 'string' ? JSON.parse(muscleGroups) : (muscleGroups || []),
+      isPrimary: isPrimary === 'true' || isPrimary === true,
+      lastModified: new Date().toISOString()
+    };
+    
+    const saved = writeMetadata(metadata);
+    
+    console.log(`📝 Máquina actualizada completamente: ${machineFile} -> ${newFilename}`, {
+      name, description, muscleGroups, isPrimary, newImage: !!req.file
+    });
+    
+    res.json({
+      success: true,
+      message: 'Máquina actualizada correctamente',
+      data: {
+        id: id,
+        oldFilename: machineFile,
+        newFilename: newFilename,
+        name: name,
+        description: description,
+        muscleGroups: metadata[newFilename].muscleGroup,
+        isPrimary: metadata[newFilename].isPrimary,
+        imageChanged: !!req.file,
+        url: `http://${SERVER_IP}:${PORT}/images/${newFilename}`,
+        saved: saved
+      }
+    });
+  } catch (error) {
+    console.error('Error updating complete machine info:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error al actualizar información completa de la máquina'
+    });
+  }
+});
+
+// ============= ENDPOINTS PARA TIPOS DE AGARRE =============
+
+// Crear nuevo tipo de agarre para una máquina
+app.post('/api/exercises/:machineId/grip-types', upload.single('image'), (req, res) => {
+  try {
+    const { machineId } = req.params;
+    const { name, description } = req.body;
+    
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        error: 'Se requiere una imagen para el tipo de agarre'
+      });
+    }
+    
+    if (!name) {
+      return res.status(400).json({
+        success: false,
+        error: 'Se requiere un nombre para el tipo de agarre'
+      });
+    }
+    
+    // Guardar metadata del nuevo tipo de agarre
+    const saved = addImageMetadata(req.file.filename, name, 'grip', machineId);
+    
+    const metadata = readMetadata();
+    metadata[req.file.filename].description = description || '';
+    writeMetadata(metadata);
+    
+    console.log(`🤏 Nuevo tipo de agarre creado: ${name} para máquina ${machineId}`);
+    
+    res.json({
+      success: true,
+      message: 'Tipo de agarre creado correctamente',
+      data: {
+        id: path.parse(req.file.filename).name,
+        name: name,
+        description: description,
+        filename: req.file.filename,
+        machineId: machineId,
+        url: `http://${SERVER_IP}:${PORT}/images/${req.file.filename}`,
+        saved: saved
+      }
+    });
+  } catch (error) {
+    console.error('Error creating grip type:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error al crear tipo de agarre'
+    });
+  }
+});
+
+// Eliminar tipo de agarre
+app.delete('/api/grip-types/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const metadata = readMetadata();
+    
+    // Buscar el archivo del tipo de agarre
+    const gripFile = Object.keys(metadata).find(filename => 
+      path.parse(filename).name === id && metadata[filename].type === 'grip'
+    );
+    
+    if (!gripFile) {
+      return res.status(404).json({
+        success: false,
+        error: 'Tipo de agarre no encontrado'
+      });
+    }
+    
+    // Eliminar archivo físico
+    const filePath = path.join(uploadsDir, gripFile);
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+    
+    // Eliminar de metadata
+    delete metadata[gripFile];
+    const saved = writeMetadata(metadata);
+    
+    console.log(`🗑️ Tipo de agarre eliminado: ${gripFile}`);
+    
+    res.json({
+      success: true,
+      message: 'Tipo de agarre eliminado correctamente',
+      data: {
+        id: id,
+        filename: gripFile,
+        saved: saved
+      }
+    });
+  } catch (error) {
+    console.error('Error deleting grip type:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error al eliminar tipo de agarre'
+    });
+  }
+});
+
 app.listen(PORT, '0.0.0.0', async () => {
   console.log(`🚀 Servidor ejecutándose en http://${SERVER_IP}:${PORT}`);
   console.log(`📁 Imágenes disponibles en http://${SERVER_IP}:${PORT}/images`);

@@ -75,6 +75,9 @@ function showSection(sectionName) {
             case 'statistics':
                 loadStatistics();
                 break;
+            case 'muscle-groups':
+                loadMuscleGroups();
+                break;
         }
     }
 }
@@ -425,6 +428,9 @@ function displayExercises(exercises) {
                     <button class="btn btn-sm btn-primary" onclick="editExercise('${exercise.id}')">
                         <i class="fas fa-edit"></i> Editar
                     </button>
+                    <button class="btn btn-sm btn-success" onclick="editMachineComplete('${exercise.id}')">
+                        <i class="fas fa-cogs"></i> Editar Completo
+                    </button>
                 </div>
             </div>
         `;
@@ -606,5 +612,387 @@ function logout() {
     if (confirm('¿Estás seguro de que quieres cerrar sesión?')) {
         // Aquí puedes agregar lógica de logout si es necesario
         window.location.href = '/';
+    }
+}
+
+// ============= FUNCIONES PARA GRUPOS MUSCULARES =============
+
+// Cargar grupos musculares disponibles
+async function loadMuscleGroups() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/muscle-groups`);
+        const result = await response.json();
+        
+        if (result.success) {
+            displayMuscleGroups(result.data);
+        } else {
+            showAlert('Error al cargar grupos musculares', 'error');
+        }
+    } catch (error) {
+        console.error('Error loading muscle groups:', error);
+        showAlert('Error de conexión al cargar grupos musculares', 'error');
+    }
+}
+
+// Mostrar grupos musculares en la interfaz
+function displayMuscleGroups(groups) {
+    const container = document.getElementById('muscle-groups-list');
+    if (!container) return;
+    
+    container.innerHTML = groups.map(group => `
+        <div class="muscle-group-card" data-group-id="${group.id}">
+            <div class="card-header">
+                <h4>${group.name}</h4>
+                <span class="machine-count">${group.machine_count} máquinas</span>
+            </div>
+            <p class="group-description">${group.description}</p>
+            <div class="card-actions">
+                <button class="btn btn-primary btn-sm" onclick="viewGroupMachines('${group.id}', '${group.name}')">
+                    <i class="fas fa-eye"></i> Ver Máquinas
+                </button>
+            </div>
+        </div>
+    `).join('');
+}
+
+// Ver máquinas de un grupo muscular específico
+async function viewGroupMachines(groupId, groupName) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/muscle-groups/${groupId}/machines`);
+        const result = await response.json();
+        
+        if (result.success) {
+            displayGroupMachinesModal(result.data, groupName);
+        } else {
+            showAlert('Error al cargar máquinas del grupo', 'error');
+        }
+    } catch (error) {
+        console.error('Error loading group machines:', error);
+        showAlert('Error de conexión al cargar máquinas', 'error');
+    }
+}
+
+// Mostrar modal con máquinas del grupo
+function displayGroupMachinesModal(machines, groupName) {
+    const modal = createModal('group-machines-modal', `Máquinas de ${groupName}`);
+    
+    const content = `
+        <div class="machines-grid">
+            ${machines.map(machine => `
+                <div class="machine-card ${machine.is_primary ? 'primary' : 'secondary'}">
+                    <img src="${machine.image_url}" alt="${machine.name}" onerror="this.src='/images/placeholder.png'">
+                    <h5>${machine.name}</h5>
+                    <span class="machine-type">${machine.is_primary ? 'Principal' : 'Secundaria'}</span>
+                    <div class="machine-actions">
+                        <button class="btn btn-sm btn-secondary" onclick="editMachineComplete('${machine.id}')">
+                            <i class="fas fa-edit"></i> Editar
+                        </button>
+                    </div>
+                </div>
+            `).join('')}
+        </div>
+    `;
+    
+    setModalContent(modal, content);
+    showModal(modal);
+}
+
+// ============= FUNCIONES PARA EDICIÓN COMPLETA DE MÁQUINAS =============
+
+// Editar máquina con toda su información
+async function editMachineComplete(machineId) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/exercises/${machineId}/complete`);
+        const result = await response.json();
+        
+        if (result.success) {
+            showEditMachineModal(result.data);
+        } else {
+            showAlert('Error al cargar información de la máquina', 'error');
+        }
+    } catch (error) {
+        console.error('Error loading complete machine info:', error);
+        showAlert('Error de conexión al cargar máquina', 'error');
+    }
+}
+
+// Mostrar modal de edición completa de máquina
+function showEditMachineModal(machine) {
+    const muscleGroups = [
+        { id: 'biceps', name: 'Bíceps' },
+        { id: 'triceps', name: 'Tríceps' },
+        { id: 'culo', name: 'Culo' },
+        { id: 'pecho', name: 'Pecho' },
+        { id: 'espalda', name: 'Espalda' },
+        { id: 'hombros', name: 'Hombros' },
+        { id: 'piernas', name: 'Piernas' },
+        { id: 'core', name: 'Core' }
+    ];
+    
+    const modal = createModal('edit-machine-complete-modal', 'Editar Máquina Completa');
+    
+    const content = `
+        <form id="edit-machine-complete-form" enctype="multipart/form-data">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="machine-name">Nombre de la Máquina</label>
+                    <input type="text" id="machine-name" name="name" value="${machine.name}" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="machine-description">Descripción</label>
+                    <textarea id="machine-description" name="description" rows="3">${machine.description || ''}</textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="machine-image">Imagen de la Máquina</label>
+                    <input type="file" id="machine-image" name="image" accept="image/*">
+                    <div class="current-image">
+                        <img src="${machine.image_url}" alt="${machine.name}" style="max-width: 150px; margin-top: 10px;">
+                        <small>Imagen actual</small>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Grupos Musculares</label>
+                    <div class="muscle-groups-checkboxes">
+                        ${muscleGroups.map(group => `
+                            <label class="checkbox-label">
+                                <input type="checkbox" 
+                                       name="muscleGroups" 
+                                       value="${group.id}" 
+                                       ${machine.muscleGroups.includes(group.id) ? 'checked' : ''}>
+                                ${group.name}
+                            </label>
+                        `).join('')}
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" 
+                               id="is-primary" 
+                               name="isPrimary" 
+                               ${machine.isPrimary ? 'checked' : ''}>
+                        Es máquina principal
+                    </label>
+                </div>
+                
+                <div class="form-group">
+                    <label>Tipos de Agarre Actuales</label>
+                    <div class="grip-types-list">
+                        ${machine.gripTypes.length > 0 ? 
+                            machine.gripTypes.map(grip => `
+                                <div class="grip-type-item">
+                                    <img src="${grip.image_url}" alt="${grip.name}" style="width: 50px; height: 50px; object-fit: cover;">
+                                    <span>${grip.name}</span>
+                                    <button type="button" class="btn btn-sm btn-danger" onclick="deleteGripType('${grip.id}')">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            `).join('') :
+                            '<p class="text-muted">No hay tipos de agarre definidos</p>'
+                        }
+                    </div>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="showAddGripTypeModal('${machine.id}')">
+                        <i class="fas fa-plus"></i> Agregar Tipo de Agarre
+                    </button>
+                </div>
+            </div>
+            
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('edit-machine-complete-modal')">
+                    Cancelar
+                </button>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save"></i> Guardar Cambios
+                </button>
+            </div>
+        </form>
+    `;
+    
+    setModalContent(modal, content);
+    showModal(modal);
+    
+    // Configurar el formulario
+    document.getElementById('edit-machine-complete-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        saveMachineComplete(machine.id, this);
+    });
+}
+
+// Guardar cambios completos de máquina
+async function saveMachineComplete(machineId, form) {
+    try {
+        const formData = new FormData(form);
+        
+        // Obtener grupos musculares seleccionados
+        const selectedGroups = Array.from(form.querySelectorAll('input[name="muscleGroups"]:checked'))
+            .map(checkbox => checkbox.value);
+        
+        formData.set('muscleGroups', JSON.stringify(selectedGroups));
+        formData.set('isPrimary', form.querySelector('#is-primary').checked);
+        
+        const response = await fetch(`${API_BASE_URL}/exercises/${machineId}/complete`, {
+            method: 'PUT',
+            body: formData
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showAlert('Máquina actualizada correctamente', 'success');
+            closeModal('edit-machine-complete-modal');
+            // Recargar la sección actual
+            if (document.getElementById('exercises-section').classList.contains('active')) {
+                loadExercises();
+            }
+        } else {
+            showAlert(result.error || 'Error al actualizar máquina', 'error');
+        }
+    } catch (error) {
+        console.error('Error saving machine:', error);
+        showAlert('Error de conexión al guardar máquina', 'error');
+    }
+}
+
+// ============= FUNCIONES PARA TIPOS DE AGARRE =============
+
+// Mostrar modal para agregar tipo de agarre
+function showAddGripTypeModal(machineId) {
+    const modal = createModal('add-grip-type-modal', 'Agregar Tipo de Agarre');
+    
+    const content = `
+        <form id="add-grip-type-form" enctype="multipart/form-data">
+            <div class="form-group">
+                <label for="grip-name">Nombre del Agarre</label>
+                <input type="text" id="grip-name" name="name" required placeholder="Ej: Agarre Ancho">
+            </div>
+            
+            <div class="form-group">
+                <label for="grip-description">Descripción</label>
+                <textarea id="grip-description" name="description" rows="3" placeholder="Descripción opcional del tipo de agarre"></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="grip-image">Imagen del Agarre</label>
+                <input type="file" id="grip-image" name="image" accept="image/*" required>
+                <small class="text-muted">Selecciona una imagen que muestre cómo usar este agarre</small>
+            </div>
+            
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('add-grip-type-modal')">
+                    Cancelar
+                </button>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> Crear Tipo de Agarre
+                </button>
+            </div>
+        </form>
+    `;
+    
+    setModalContent(modal, content);
+    showModal(modal);
+    
+    document.getElementById('add-grip-type-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        saveGripType(machineId, this);
+    });
+}
+
+// Guardar nuevo tipo de agarre
+async function saveGripType(machineId, form) {
+    try {
+        const formData = new FormData(form);
+        
+        const response = await fetch(`${API_BASE_URL}/exercises/${machineId}/grip-types`, {
+            method: 'POST',
+            body: formData
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showAlert('Tipo de agarre creado correctamente', 'success');
+            closeModal('add-grip-type-modal');
+            // Recargar la información de la máquina
+            editMachineComplete(machineId);
+        } else {
+            showAlert(result.error || 'Error al crear tipo de agarre', 'error');
+        }
+    } catch (error) {
+        console.error('Error saving grip type:', error);
+        showAlert('Error de conexión al crear tipo de agarre', 'error');
+    }
+}
+
+// Eliminar tipo de agarre
+async function deleteGripType(gripId) {
+    if (!confirm('¿Estás seguro de que quieres eliminar este tipo de agarre?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_BASE_URL}/grip-types/${gripId}`, {
+            method: 'DELETE'
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showAlert('Tipo de agarre eliminado correctamente', 'success');
+            // Recargar la vista actual
+            location.reload();
+        } else {
+            showAlert(result.error || 'Error al eliminar tipo de agarre', 'error');
+        }
+    } catch (error) {
+        console.error('Error deleting grip type:', error);
+        showAlert('Error de conexión al eliminar tipo de agarre', 'error');
+    }
+}
+
+// ============= FUNCIONES DE UTILIDAD PARA MODALES =============
+
+// Crear modal base
+function createModal(id, title) {
+    let modal = document.getElementById(id);
+    if (modal) {
+        modal.remove();
+    }
+    
+    modal = document.createElement('div');
+    modal.id = id;
+    modal.className = 'modal';
+    modal.innerHTML = `
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>${title}</h3>
+                <button type="button" class="close-modal" onclick="closeModal('${id}')">&times;</button>
+            </div>
+            <div class="modal-body"></div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    return modal;
+}
+
+// Establecer contenido del modal
+function setModalContent(modal, content) {
+    const modalBody = modal.querySelector('.modal-body');
+    modalBody.innerHTML = content;
+}
+
+// Mostrar modal
+function showModal(modal) {
+    modal.style.display = 'block';
+}
+
+// Cerrar modal
+function closeModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        modal.style.display = 'none';
     }
 }
