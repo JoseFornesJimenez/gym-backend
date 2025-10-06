@@ -1,0 +1,184 @@
+{
+  "44745591_machine_jaca.png": {
+    "name": "Jaca",
+    "type": "machine",
+    "machineFor": null,
+    "uploadDate": "2025-09-23T16:25:45.629Z",
+    "lastModified": "2025-09-23T16:25:45.629Z"
+  },
+  "44771034_grip_mano.png": {
+    "name": "Mano",
+    "type": "grip",
+    "machineFor": null,
+    "uploadDate": "2025-09-23T16:26:11.068Z",
+    "lastModified": "2025-09-23T16:26:11.068Z"
+  },
+  "44806878_machine_remo.png": {
+    "name": "Remo",
+    "type": "machine",
+    "machineFor": null,
+    "uploadDate": "2025-09-23T16:26:47.182Z",
+    "lastModified": "2025-09-23T16:26:47.182Z"
+  },
+  "44828964_grip_abierto.png": {
+    "name": "Abierto",
+    "type": "grip",
+    "machineFor": null,
+    "uploadDate": "2025-09-23T16:27:08.970Z",
+    "lastModified": "2025-09-23T16:27:08.970Z"
+  },
+  "44867129_machine_isquios.png": {
+    "name": "Isquios",
+    "type": "machine",
+    "machineFor": null,
+    "uploadDate": "2025-09-23T16:27:47.140Z",
+    "lastModified": "2025-09-23T16:27:47.140Z"
+  },
+  "44995410_machine_abductores.png": {
+    "name": "Abductores",
+    "type": "machine",
+    "machineFor": null,
+    "uploadDate": "2025-09-23T16:29:55.420Z",
+    "lastModified": "2025-09-23T16:29:55.420Z"
+  },
+  "45470982_machine_extension_de_cuadriceps.png": {
+    "name": "Extension de Cuadriceps",
+    "type": "machine",
+    "machineFor": null,
+    "uploadDate": "2025-09-23T16:37:51.000Z",
+    "lastModified": "2025-09-23T16:37:51.000Z"
+  },
+  "45673055_grip_cuerdas.png": {
+    "name": "Cuerdas",
+    "type": "grip",
+    "machineFor": null,
+    "uploadDate": "2025-09-23T16:41:13.058Z",
+    "lastModified": "2025-09-23T16:41:13.058Z"
+  },
+  "45823499_machine_prensa.png": {
+    "name": "Prensa",
+    "type": "machine",
+    "machineFor": null,
+    "uploadDate": "2025-09-23T16:43:43.547Z",
+    "lastModified": "2025-09-23T16:43:43.547Z"
+  },
+  "52708213_1000100037.jpg": {
+    "name": "Femoral",
+    "type": "machine",
+    "machineFor": null,
+    "uploadDate": "2025-09-23T18:35:01.083Z",
+    "lastModified": "2025-09-23T18:38:34.452Z"
+  },
+  "53338792_1000100040.jpg": {
+    "name": "Gemelo",
+    "type": "machine",
+    "machineFor": null,
+    "uploadDate": "2025-09-23T18:43:49.550Z",
+    "lastModified": "2025-09-23T18:49:02.179Z"
+  },
+  "53582707_1000100046.jpg": {
+    "name": "Polea",
+    "type": "machine",
+    "machineFor": null,
+    "uploadDate": "2025-09-23T16:40:05.054Z",
+    "lastModified": "2025-09-23T18:53:02.840Z"
+  },
+  "55353350_machine_trono_pecho.png": {
+    "name": "Trono(Pecho)",
+    "type": "machine",
+    "machineFor": null,
+    "uploadDate": "2025-09-30T18:02:33.360Z",
+    "lastModified": "2025-09-30T18:02:33.360Z"
+  },
+  "55437348_machine_press_inclinado.png": {
+    "name": "Press inclinado",
+    "type": "machine",
+    "machineFor": null,
+    "uploadDate": "2025-09-30T18:03:57.357Z",
+    "lastModified": "2025-09-30T18:03:57.357Z"
+  },
+  "55515947_machine_pecho_sentado.png": {
+    "name": "Pecho Sentado",
+    "type": "machine",
+    "machineFor": null,
+    "uploadDate": "2025-09-30T18:05:15.961Z",
+    "lastModified": "2025-09-30T18:05:15.961Z"
+  },
+  "55616790_machine_triceps_mancuerna.png": {
+    "name": "Triceps Mancuerna",
+    "type": "machine",
+    "machineFor": null,
+    "uploadDate": "2025-09-30T18:06:56.798Z",
+    "lastModified": "2025-09-30T18:06:56.798Z"
+  },
+  "55734815_machine_larry_triceps.png": {
+    "name": "Larry triceps",
+    "type": "machine",
+    "machineFor": null,
+    "uploadDate": "2025-09-30T18:08:54.825Z",
+    "lastModified": "2025-09-30T18:08:54.825Z"
+  },
+  "55887675_machine_triceps_sentado.png": {
+    "name": "Triceps Sentado",
+    "type": "machine",
+    "machineFor": null,
+    "uploadDate": "2025-09-30T18:11:27.684Z",
+    "lastModified": "2025-09-30T18:11:27.684Z"
+  },
+  "57576542_grip_mancuerna.jpg": {
+    "name": "Mancuerna",
+    "type": "grip",
+    "machineFor": null,
+    "uploadDate": "2025-09-30T18:39:36.587Z",
+    "lastModified": "2025-09-30T18:39:36.587Z"
+  },
+  "15515778_1000101291.jpg": {
+    "name": "Jalón al pecho",
+    "type": "machine",
+    "machineFor": null,
+    "uploadDate": "2025-10-02T14:11:28.638Z",
+    "lastModified": "2025-10-02T14:31:56.787Z"
+  },
+  "15566290_grip_abierto_2.jpg": {
+    "name": "Abierto 2",
+    "type": "grip",
+    "machineFor": null,
+    "uploadDate": "2025-10-02T14:32:47.035Z",
+    "lastModified": "2025-10-02T14:32:47.035Z"
+  },
+  "16074017_machine_curl_de_biceps.jpg": {
+    "name": "Curl de biceps",
+    "type": "machine",
+    "machineFor": null,
+    "uploadDate": "2025-10-02T14:41:14.842Z",
+    "lastModified": "2025-10-02T14:41:14.842Z"
+  },
+  "16138934_grip_recto.png": {
+    "name": "Recto",
+    "type": "grip",
+    "machineFor": null,
+    "uploadDate": "2025-10-02T14:42:19.250Z",
+    "lastModified": "2025-10-02T14:42:19.250Z"
+  },
+  "16639757_machine_mancuerna.png": {
+    "name": "Mancuerna",
+    "type": "machine",
+    "machineFor": null,
+    "uploadDate": "2025-10-02T14:50:40.664Z",
+    "lastModified": "2025-10-02T14:50:40.664Z"
+  },
+  "16659491_grip_biceps.jpg": {
+    "name": "Biceps",
+    "type": "grip",
+    "machineFor": null,
+    "uploadDate": "2025-10-02T14:50:59.649Z",
+    "lastModified": "2025-10-02T14:50:59.649Z"
+  },
+  "62852278_machine_sentadilla_multipower.jpg": {
+    "name": "Sentadilla multipower",
+    "type": "machine",
+    "machineFor": null,
+    "uploadDate": "2025-10-04T07:27:32.351Z",
+    "lastModified": "2025-10-04T07:27:32.351Z"
+  }
+}

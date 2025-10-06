@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Administración - Gym App</title>
+    <link rel="stylesheet" href="/css/admin.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="admin-container">
+        <!-- Sidebar -->
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h2><i class="fas fa-dumbbell"></i> Gym Admin</h2>
+            </div>
+            <ul class="sidebar-nav">
+                <li class="nav-item active" data-section="dashboard">
+                    <a href="#"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
+                </li>
+                <li class="nav-item" data-section="users">
+                    <a href="#"><i class="fas fa-users"></i> Usuarios</a>
+                </li>
+                <li class="nav-item" data-section="exercises">
+                    <a href="#"><i class="fas fa-dumbbell"></i> Ejercicios</a>
+                </li>
+                <li class="nav-item" data-section="images">
+                    <a href="#"><i class="fas fa-images"></i> Gestión de Imágenes</a>
+                </li>
+                <li class="nav-item" data-section="statistics">
+                    <a href="#"><i class="fas fa-chart-line"></i> Estadísticas</a>
+                </li>
+            </ul>
+        </nav>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <header class="top-header">
+                <h1 id="page-title">Dashboard</h1>
+                <div class="header-actions">
+                    <span id="admin-info">Administrador</span>
+                    <button class="btn btn-secondary" onclick="logout()">
+                        <i class="fas fa-sign-out-alt"></i> Cerrar Sesión
+                    </button>
+                </div>
+            </header>
+
+            <!-- Dashboard Section -->
+            <section id="dashboard-section" class="content-section active">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3 id="total-users">0</h3>
+                            <p>Usuarios Totales</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-user-check"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3 id="active-users">0</h3>
+                            <p>Usuarios Activos</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-dumbbell"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3 id="total-exercises">0</h3>
+                            <p>Ejercicios</p>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3 id="total-records">0</h3>
+                            <p>Registros de Peso</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Users Section -->
+            <section id="users-section" class="content-section">
+                <div class="section-header">
+                    <h2>Gestión de Usuarios</h2>
+                    <div class="header-actions">
+                        <button class="btn btn-primary" onclick="showCreateUserModal()">
+                            <i class="fas fa-plus"></i> Nuevo Usuario
+                        </button>
+                        <button class="btn btn-secondary" onclick="refreshUsers()">
+                            <i class="fas fa-sync"></i> Actualizar
+                        </button>
+                    </div>
+                </div>
+
+                <div class="search-bar">
+                    <input type="text" id="user-search" placeholder="Buscar usuarios..." onkeyup="filterUsers()">
+                    <i class="fas fa-search"></i>
+                </div>
+
+                <div class="table-container">
+                    <table class="data-table" id="users-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Usuario</th>
+                                <th>Email</th>
+                                <th>Nombre</th>
+                                <th>Estado</th>
+                                <th>Último Login</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="users-tbody">
+                            <!-- Users will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Exercises Section -->
+            <section id="exercises-section" class="content-section">
+                <div class="section-header">
+                    <h2>Gestión de Ejercicios</h2>
+                    <button class="btn btn-secondary" onclick="refreshExercises()">
+                        <i class="fas fa-sync"></i> Actualizar
+                    </button>
+                </div>
+                <div id="exercises-grid" class="exercises-grid">
+                    <!-- Exercises will be loaded here -->
+                </div>
+            </section>
+
+            <!-- Images Section -->
+            <section id="images-section" class="content-section">
+                <div class="section-header">
+                    <h2>Gestión de Imágenes</h2>
+                    <div class="header-actions">
+                        <input type="file" id="image-upload" accept="image/*" style="display: none" onchange="uploadImage()">
+                        <button class="btn btn-primary" onclick="document.getElementById('image-upload').click()">
+                            <i class="fas fa-upload"></i> Subir Imagen
+                        </button>
+                        <button class="btn btn-secondary" onclick="refreshImages()">
+                            <i class="fas fa-sync"></i> Actualizar
+                        </button>
+                    </div>
+                </div>
+                <div id="images-grid" class="images-grid">
+                    <!-- Images will be loaded here -->
+                </div>
+            </section>
+
+            <!-- Statistics Section -->
+            <section id="statistics-section" class="content-section">
+                <div class="section-header">
+                    <h2>Estadísticas del Sistema</h2>
+                </div>
+                <div class="charts-container">
+                    <div class="chart-card">
+                        <h3>Usuarios Registrados por Mes</h3>
+                        <canvas id="users-chart"></canvas>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Actividad de Entrenamientos</h3>
+                        <canvas id="activity-chart"></canvas>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <!-- Create/Edit User Modal -->
+    <div id="user-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="user-modal-title">Nuevo Usuario</h3>
+                <span class="close" onclick="closeUserModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="user-form">
+                    <input type="hidden" id="user-id">
+                    <div class="form-group">
+                        <label for="username">Nombre de Usuario:</label>
+                        <input type="text" id="username" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="email">Email:</label>
+                        <input type="email" id="email" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="first-name">Nombre:</label>
+                        <input type="text" id="first-name">
+                    </div>
+                    <div class="form-group">
+                        <label for="last-name">Apellido:</label>
+                        <input type="text" id="last-name">
+                    </div>
+                    <div class="form-group" id="password-group">
+                        <label for="password">Contraseña:</label>
+                        <input type="password" id="password">
+                        <small>Dejar vacío para mantener la contraseña actual (solo al editar)</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="phone">Teléfono:</label>
+                        <input type="tel" id="phone">
+                    </div>
+                    <div class="form-group">
+                        <label for="date-of-birth">Fecha de Nacimiento:</label>
+                        <input type="date" id="date-of-birth">
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="is-admin"> Administrador
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="is-active" checked> Activo
+                        </label>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeUserModal()">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="saveUser()">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reset Password Modal -->
+    <div id="reset-password-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Reiniciar Contraseña</h3>
+                <span class="close" onclick="closeResetPasswordModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p>¿Estás seguro de que quieres reiniciar la contraseña para <strong id="reset-user-name"></strong>?</p>
+                <div class="form-group">
+                    <label for="new-password">Nueva Contraseña:</label>
+                    <input type="password" id="new-password" required>
+                </div>
+                <div class="form-group">
+                    <label for="confirm-password">Confirmar Contraseña:</label>
+                    <input type="password" id="confirm-password" required>
+                </div>
+                <input type="hidden" id="reset-user-id">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeResetPasswordModal()">Cancelar</button>
+                <button type="button" class="btn btn-danger" onclick="resetUserPassword()">Reiniciar Contraseña</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="spinner"></div>
+        <p>Cargando...</p>
+    </div>
+
+    <script src="/js/admin.js"></script>
+</body>
+</html>
