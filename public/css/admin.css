@@ -1167,6 +1167,12 @@ body {
     transition: all 0.3s ease;
 }
 
+.achievement-item.unlocked {
+    background: linear-gradient(135deg, #f8f9ff 0%, #fff5e6 100%);
+    border-left: 4px solid #28a745;
+    border-color: #28a745;
+}
+
 .achievement-item:hover {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     transform: translateY(-1px);
@@ -1190,13 +1196,48 @@ body {
 }
 
 .achievement-info p {
-    margin: 0;
+    margin: 0 0 5px 0;
     color: #6c757d;
     font-size: 0.9rem;
 }
 
+.achievement-info small {
+    font-weight: bold;
+}
+
 .achievement-status {
     margin-left: 15px;
+}
+
+/* Estadísticas detalladas */
+.user-stats-detailed {
+    margin-top: 20px;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border-left: 4px solid #007bff;
+}
+
+.user-stats-detailed h4 {
+    margin-bottom: 15px;
+    color: #495057;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 10px;
+}
+
+.stat-item {
+    padding: 10px 15px;
+    background: white;
+    border-radius: 5px;
+    font-size: 0.9rem;
+}
+
+.stat-item strong {
+    color: #495057;
 }
 
 .loading, .error {

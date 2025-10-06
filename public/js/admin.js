@@ -1104,11 +1104,17 @@ async function loadAdditionalAchievementData(users) {
         const user = users[i];
         
         try {
-            // Cargar workouts
-            const workoutsResponse = await fetch(`${API_BASE_URL}/workouts/user/${user.id}`);
-            if (workoutsResponse.ok) {
-                const workoutsData = await workoutsResponse.json(); 
-                user.totalWorkouts = workoutsData.workouts?.length || 0;
+            // Cargar datos completos de logros del usuario
+            const achievementsResponse = await fetch(`${API_BASE_URL}/admin/users/${user.id}/achievements`);
+            if (achievementsResponse.ok) {
+                const achievementsData = await achievementsResponse.json();
+                if (achievementsData.success) {
+                    user.totalWorkouts = achievementsData.stats.totalWorkouts;
+                    user.achievementsCount = achievementsData.unlockedCount;
+                    user.totalPoints = achievementsData.totalPoints;
+                    user.achievementsDetails = achievementsData.achievements;
+                    user.stats = achievementsData.stats;
+                }
             }
             
             // Cargar reset status
@@ -1119,15 +1125,12 @@ async function loadAdditionalAchievementData(users) {
                 user.hasBeenReset = resetData.hasReset;
             }
             
-            // Simular logros desbloqueados basado en workouts
-            user.achievementsCount = Math.min(Math.floor(user.totalWorkouts / 2), 10);
-            
         } catch (error) {
             console.error(`❌ Error cargando datos adicionales para ${user.username}:`, error);
         }
         
         // Actualizar la fila específica en la tabla cada pocos usuarios
-        if ((i + 1) % 3 === 0 || i === users.length - 1) {
+        if ((i + 1) % 2 === 0 || i === users.length - 1) {
             renderAchievements();
             updateAchievementStats();
         }
@@ -1145,33 +1148,44 @@ function renderAchievements() {
         return;
     }
     
-    tbody.innerHTML = currentAchievements.map(user => `
-        <tr>
-            <td>${user.id}</td>
-            <td>${user.username}</td>
-            <td>${user.email}</td>
-            <td class="text-center">${user.totalWorkouts}</td>
-            <td class="text-center">
-                <span class="badge badge-info">${user.achievementsCount}</span>
-            </td>
-            <td class="text-center">
-                ${user.hasBeenReset 
-                    ? `<small class="text-muted">${formatDate(user.lastReset)}</small>`
-                    : '<span class="text-muted">Nunca</span>'
-                }
-            </td>
-            <td class="actions">
-                <button class="btn btn-warning btn-sm" onclick="resetUserAchievements(${user.id}, '${user.username}')" 
-                        title="Reiniciar Logros">
-                    <i class="fas fa-redo"></i> Reset
-                </button>
-                <button class="btn btn-info btn-sm" onclick="viewUserAchievements(${user.id}, '${user.username}')" 
-                        title="Ver Detalles">
-                    <i class="fas fa-eye"></i> Ver
-                </button>
-            </td>
-        </tr>
-    `).join('');
+    tbody.innerHTML = currentAchievements.map(user => {
+        const achievementsBadge = user.achievementsCount > 0 
+            ? `<span class="badge badge-success">${user.achievementsCount}/10</span>`
+            : `<span class="badge badge-secondary">${user.achievementsCount}/10</span>`;
+            
+        const workoutsBadge = user.totalWorkouts > 0
+            ? `<span class="badge badge-primary">${user.totalWorkouts}</span>`
+            : `<span class="badge badge-secondary">${user.totalWorkouts}</span>`;
+            
+        return `
+            <tr>
+                <td>${user.id}</td>
+                <td>
+                    <strong>${user.username}</strong>
+                    ${user.totalPoints ? `<br><small class="text-success">✨ ${user.totalPoints} puntos</small>` : ''}
+                </td>
+                <td>${user.email}</td>
+                <td class="text-center">${workoutsBadge}</td>
+                <td class="text-center">${achievementsBadge}</td>
+                <td class="text-center">
+                    ${user.hasBeenReset 
+                        ? `<small class="text-warning">⚠️ ${formatDate(user.lastReset)}</small>`
+                        : '<span class="text-muted">Nunca</span>'
+                    }
+                </td>
+                <td class="actions">
+                    <button class="btn btn-warning btn-sm" onclick="resetUserAchievements(${user.id}, '${user.username}')" 
+                            title="Reiniciar Logros">
+                        <i class="fas fa-redo"></i> Reset
+                    </button>
+                    <button class="btn btn-info btn-sm" onclick="viewUserAchievements(${user.id}, '${user.username}')" 
+                            title="Ver Detalles">
+                        <i class="fas fa-eye"></i> Ver
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
 }
 
 // Reiniciar logros de usuario
@@ -1220,16 +1234,16 @@ async function viewUserAchievements(userId, username) {
     // Actualizar título del modal
     document.getElementById('achievements-modal-title').textContent = `Logros de ${username}`;
     
+    // Mostrar loading en el modal
+    document.getElementById('modal-achievements-list').innerHTML = '<div class="loading">Cargando logros detallados...</div>';
+    
     // Actualizar estadísticas básicas
-    document.getElementById('modal-total-workouts').textContent = user.totalWorkouts;
-    document.getElementById('modal-unlocked-achievements').textContent = user.achievementsCount;
-    document.getElementById('modal-total-points').textContent = user.achievementsCount * 15; // Estimado
+    document.getElementById('modal-total-workouts').textContent = user.totalWorkouts || 0;
+    document.getElementById('modal-unlocked-achievements').textContent = user.achievementsCount || 0;
+    document.getElementById('modal-total-points').textContent = user.totalPoints || 0;
     document.getElementById('modal-last-reset').textContent = user.hasBeenReset 
         ? formatDate(user.lastReset) 
         : 'Nunca';
-    
-    // Cargar lista detallada de logros
-    await loadUserAchievementDetails(userId);
     
     // Guardar ID de usuario actual para el botón de reset
     window.currentAchievementUserId = userId;
@@ -1237,46 +1251,90 @@ async function viewUserAchievements(userId, username) {
     
     // Mostrar modal
     document.getElementById('achievements-modal').style.display = 'block';
+    
+    // Cargar lista detallada de logros
+    await loadUserAchievementDetails(userId);
 }
 
 // Cargar detalles específicos de logros del usuario
 async function loadUserAchievementDetails(userId) {
     const achievementsList = document.getElementById('modal-achievements-list');
-    achievementsList.innerHTML = '<div class="loading">Cargando logros...</div>';
     
     try {
-        // Lista de todos los logros disponibles
-        const availableAchievements = [
-            { id: 'first_workout', name: 'Primer Paso', description: 'Completa tu primer entrenamiento', icon: '🎯' },
-            { id: 'first_weight_record', name: 'Primera Marca', description: 'Registra tu primer peso', icon: '📊' },
-            { id: 'second_workout', name: 'Segundo Intento', description: 'Completa tu segundo entrenamiento', icon: '🚀' },
-            { id: 'weight_lifter', name: 'Levantador de Pesos', description: 'Levanta un total de 1000 kg', icon: '🏋️' },
-            { id: 'rep_master', name: 'Maestro de Repeticiones', description: 'Completa 100 repeticiones', icon: '🔄' },
-            { id: 'personal_record', name: 'Récord Personal', description: 'Supera tu récord personal', icon: '🏆' },
-            { id: 'exercise_explorer', name: 'Explorador de Ejercicios', description: 'Prueba 5 ejercicios diferentes', icon: '🧭' },
-            { id: 'machine_master', name: 'Maestro de Máquinas', description: 'Usa 10 máquinas diferentes', icon: '🏗️' },
-            { id: 'week_warrior', name: 'Guerrero Semanal', description: 'Entrena 3 veces en una semana', icon: '💪' },
-            { id: 'consistency_king', name: 'Rey de la Consistencia', description: 'Entrena 3 días seguidos', icon: '👑' }
-        ];
+        // Obtener datos detallados de logros del usuario
+        const response = await fetch(`${API_BASE_URL}/admin/users/${userId}/achievements`);
         
-        // Por ahora mostrar todos los logros como no desbloqueados
-        // En una implementación real, consultarías el servidor para obtener los logros específicos
-        achievementsList.innerHTML = availableAchievements.map(achievement => `
-            <div class="achievement-item">
-                <div class="achievement-icon">${achievement.icon}</div>
-                <div class="achievement-info">
-                    <h5>${achievement.name}</h5>
-                    <p>${achievement.description}</p>
+        if (!response.ok) {
+            throw new Error(`Error HTTP: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (!data.success) {
+            throw new Error(data.error || 'Error obteniendo logros');
+        }
+        
+        const achievements = data.achievements;
+        const stats = data.stats;
+        
+        // Actualizar estadísticas en el modal con datos reales
+        document.getElementById('modal-total-workouts').textContent = stats.totalWorkouts;
+        document.getElementById('modal-unlocked-achievements').textContent = data.unlockedCount;
+        document.getElementById('modal-total-points').textContent = data.totalPoints;
+        
+        // Renderizar lista de logros con estados reales
+        achievementsList.innerHTML = achievements.map(achievement => {
+            const badgeClass = achievement.unlocked ? 'badge-success' : 'badge-secondary';
+            const badgeText = achievement.unlocked ? 'Desbloqueado' : 'Bloqueado';
+            const itemClass = achievement.unlocked ? 'achievement-item unlocked' : 'achievement-item';
+            
+            return `
+                <div class="${itemClass}">
+                    <div class="achievement-icon">${achievement.icon}</div>
+                    <div class="achievement-info">
+                        <h5>${achievement.name}</h5>
+                        <p>${achievement.description}</p>
+                        ${achievement.unlocked ? `<small class="text-success">✨ +${achievement.points} puntos</small>` : ''}
+                    </div>
+                    <div class="achievement-status">
+                        <span class="badge ${badgeClass}">${badgeText}</span>
+                    </div>
                 </div>
-                <div class="achievement-status">
-                    <span class="badge badge-warning">Bloqueado</span>
+            `;
+        }).join('');
+        
+        // Agregar estadísticas adicionales
+        const statsHTML = `
+            <div class="user-stats-detailed">
+                <h4>📊 Estadísticas Detalladas:</h4>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <strong>💪 Total Sets:</strong> ${stats.totalSets}
+                    </div>
+                    <div class="stat-item">
+                        <strong>🔄 Total Reps:</strong> ${stats.totalReps}
+                    </div>
+                    <div class="stat-item">
+                        <strong>🏋️ Peso Total:</strong> ${Math.round(stats.totalWeightLifted)} kg
+                    </div>
+                    <div class="stat-item">
+                        <strong>🎯 Ejercicios Únicos:</strong> ${stats.uniqueExercises}
+                    </div>
+                    <div class="stat-item">
+                        <strong>🏗️ Máquinas Únicas:</strong> ${stats.uniqueMachines}
+                    </div>
+                    <div class="stat-item">
+                        <strong>🏆 Récords Personales:</strong> ${stats.personalRecords}
+                    </div>
                 </div>
             </div>
-        `).join('');
+        `;
+        
+        achievementsList.innerHTML += statsHTML;
         
     } catch (error) {
         console.error('Error cargando detalles de logros:', error);
-        achievementsList.innerHTML = '<div class="error">Error cargando logros</div>';
+        achievementsList.innerHTML = `<div class="error">❌ Error cargando logros: ${error.message}</div>`;
     }
 }
 

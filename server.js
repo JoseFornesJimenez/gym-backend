@@ -2095,6 +2095,188 @@ app.get('/api/users/:id/achievements-reset-status', async (req, res) => {
   }
 });
 
+// Ruta para obtener los logros calculados de un usuario (para admin)
+app.get('/api/admin/users/:id/achievements', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Obtener datos del usuario
+    const userResult = await db.query('SELECT * FROM users WHERE id = $1', [id]);
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Usuario no encontrado' });
+    }
+    
+    const user = userResult.rows[0];
+    
+    // Obtener workouts del usuario
+    const workoutsResult = await db.query(
+      'SELECT * FROM workouts WHERE user_id = $1 ORDER BY date DESC',
+      [id]
+    );
+    const workouts = workoutsResult.rows;
+    
+    // Obtener registros de peso del usuario
+    const weightResult = await db.query(
+      'SELECT * FROM weight_records WHERE user_id = $1 ORDER BY date DESC',
+      [id]
+    );
+    const weightRecords = weightResult.rows;
+    
+    // Calcular estadísticas del usuario
+    const stats = {
+      totalWorkouts: workouts.length,
+      totalSets: 0,
+      totalReps: 0,
+      totalWeightLifted: 0,
+      uniqueExercises: new Set(),
+      uniqueMachines: new Set(),
+      personalRecords: 0,
+      maxWeight: 0
+    };
+    
+    // Procesar registros de peso
+    const exerciseMaxes = {};
+    weightRecords.forEach(record => {
+      const weight = parseFloat(record.weight || 0);
+      const reps = parseInt(record.reps || 0);
+      const sets = parseInt(record.sets || 1);
+      const exercise = record.exercise_name || 'Unknown';
+      
+      stats.totalSets += sets;
+      stats.totalReps += (reps * sets);
+      stats.totalWeightLifted += (weight * reps * sets);
+      stats.uniqueExercises.add(exercise);
+      
+      if (record.machine_id) {
+        stats.uniqueMachines.add(record.machine_id.toString());
+      }
+      
+      if (weight > stats.maxWeight) {
+        stats.maxWeight = weight;
+      }
+      
+      // Calcular récords personales
+      if (!exerciseMaxes[exercise] || weight > exerciseMaxes[exercise]) {
+        if (exerciseMaxes[exercise]) {
+          stats.personalRecords++;
+        }
+        exerciseMaxes[exercise] = weight;
+      }
+    });
+    
+    stats.uniqueExercises = stats.uniqueExercises.size;
+    stats.uniqueMachines = stats.uniqueMachines.size;
+    
+    // Definir logros y verificar cuáles están desbloqueados
+    const achievements = [
+      {
+        id: 'first_workout',
+        name: 'Primer Paso',
+        description: 'Completa tu primer entrenamiento',
+        icon: '🎯',
+        points: 10,
+        unlocked: stats.totalWorkouts >= 1
+      },
+      {
+        id: 'first_weight_record',
+        name: 'Primera Marca',
+        description: 'Registra tu primer peso',
+        icon: '📊',
+        points: 15,
+        unlocked: stats.totalSets >= 1
+      },
+      {
+        id: 'second_workout',
+        name: 'Segundo Intento',
+        description: 'Completa tu segundo entrenamiento',
+        icon: '🚀',
+        points: 15,
+        unlocked: stats.totalWorkouts >= 2
+      },
+      {
+        id: 'weight_lifter',
+        name: 'Levantador de Pesos',
+        description: 'Levanta un total de 1000 kg',
+        icon: '🏋️',
+        points: 30,
+        unlocked: stats.totalWeightLifted >= 1000
+      },
+      {
+        id: 'rep_master',
+        name: 'Maestro de Repeticiones',
+        description: 'Completa 100 repeticiones en total',
+        icon: '🔄',
+        points: 25,
+        unlocked: stats.totalReps >= 100
+      },
+      {
+        id: 'personal_record',
+        name: 'Récord Personal',
+        description: 'Supera tu récord personal',
+        icon: '🏆',
+        points: 40,
+        unlocked: stats.personalRecords >= 1
+      },
+      {
+        id: 'exercise_explorer',
+        name: 'Explorador de Ejercicios',
+        description: 'Prueba 5 ejercicios diferentes',
+        icon: '🧭',
+        points: 25,
+        unlocked: stats.uniqueExercises >= 5
+      },
+      {
+        id: 'machine_master',
+        name: 'Maestro de Máquinas',
+        description: 'Usa 10 máquinas diferentes',
+        icon: '🏗️',
+        points: 30,
+        unlocked: stats.uniqueMachines >= 10
+      },
+      {
+        id: 'five_workouts',
+        name: 'Constante',
+        description: 'Completa 5 entrenamientos',
+        icon: '💪',
+        points: 25,
+        unlocked: stats.totalWorkouts >= 5
+      },
+      {
+        id: 'ten_workouts',
+        name: 'Dedicado',
+        description: 'Completa 10 entrenamientos',
+        icon: '👑',
+        points: 50,
+        unlocked: stats.totalWorkouts >= 10
+      }
+    ];
+    
+    const unlockedAchievements = achievements.filter(a => a.unlocked);
+    const totalPoints = unlockedAchievements.reduce((sum, a) => sum + a.points, 0);
+    
+    res.json({
+      success: true,
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        name: user.name
+      },
+      stats,
+      achievements,
+      unlockedCount: unlockedAchievements.length,
+      totalPoints
+    });
+    
+  } catch (error) {
+    console.error('Error getting user achievements:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Error interno del servidor' 
+    });
+  }
+});
+
 app.put('/api/admin/users/:id/status', async (req, res) => {
   try {
     const { id } = req.params;
