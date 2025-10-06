@@ -1949,6 +1949,152 @@ app.post('/api/admin/users/:id/reset-password', async (req, res) => {
   }
 });
 
+// Ruta para reiniciar los logros de un usuario
+app.post('/api/admin/users/:id/reset-achievements', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Verificar que el usuario existe
+    const userResult = await db.query(
+      'SELECT id, name, email FROM users WHERE id = $1',
+      [id]
+    );
+    
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Usuario no encontrado' 
+      });
+    }
+    
+    const user = userResult.rows[0];
+    
+    // Crear/actualizar registro de achievements reset
+    // Si no existe una tabla específica para achievements, registramos el reset en una tabla de logs
+    const resetResult = await db.query(`
+      INSERT INTO achievement_resets (user_id, reset_date, admin_action)
+      VALUES ($1, NOW(), true)
+      ON CONFLICT (user_id) 
+      DO UPDATE SET reset_date = NOW(), admin_action = true
+    `, [id]);
+    
+    // Log de la acción
+    console.log(`🏆 Logros reiniciados para usuario: ${user.name} (${user.email}) - ID: ${id}`);
+    
+    res.json({
+      success: true,
+      message: `Logros reiniciados correctamente para ${user.name}`,
+      data: {
+        userId: id,
+        userName: user.name,
+        resetDate: new Date().toISOString()
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error resetting achievements:', error);
+    
+    // Si la tabla no existe, intentamos crearla
+    if (error.code === '42P01') { // Tabla no existe
+      try {
+        await db.query(`
+          CREATE TABLE IF NOT EXISTS achievement_resets (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+            reset_date TIMESTAMP DEFAULT NOW(),
+            admin_action BOOLEAN DEFAULT false,
+            UNIQUE(user_id)
+          )
+        `);
+        
+        // Intentar nuevamente después de crear la tabla
+        const resetResult = await db.query(`
+          INSERT INTO achievement_resets (user_id, reset_date, admin_action)
+          VALUES ($1, NOW(), true)
+        `, [id]);
+        
+        const userResult = await db.query(
+          'SELECT name FROM users WHERE id = $1',
+          [id]
+        );
+        
+        const userName = userResult.rows[0]?.name || 'Usuario';
+        
+        res.json({
+          success: true,
+          message: `Logros reiniciados correctamente para ${userName}`,
+          data: {
+            userId: id,
+            userName: userName,
+            resetDate: new Date().toISOString()
+          }
+        });
+        
+      } catch (createError) {
+        console.error('Error creating achievement_resets table:', createError);
+        res.status(500).json({ 
+          success: false, 
+          error: 'Error interno del servidor al crear tabla de logros' 
+        });
+      }
+    } else {
+      res.status(500).json({ 
+        success: false, 
+        error: 'Error interno del servidor' 
+      });
+    }
+  }
+});
+
+// Ruta para obtener el estado de reset de logros de un usuario (para la app)
+app.get('/api/users/:id/achievements-reset-status', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const result = await db.query(`
+      SELECT reset_date, admin_action 
+      FROM achievement_resets 
+      WHERE user_id = $1
+      ORDER BY reset_date DESC 
+      LIMIT 1
+    `, [id]);
+    
+    if (result.rows.length === 0) {
+      return res.json({
+        success: true,
+        hasReset: false,
+        resetDate: null
+      });
+    }
+    
+    const resetInfo = result.rows[0];
+    
+    res.json({
+      success: true,
+      hasReset: true,
+      resetDate: resetInfo.reset_date,
+      wasAdminAction: resetInfo.admin_action
+    });
+    
+  } catch (error) {
+    console.error('Error checking achievement reset status:', error);
+    
+    // Si la tabla no existe, retornar que no hay reset
+    if (error.code === '42P01') {
+      return res.json({
+        success: true,
+        hasReset: false,
+        resetDate: null
+      });
+    }
+    
+    res.status(500).json({ 
+      success: false, 
+      error: 'Error interno del servidor' 
+    });
+  }
+});
+
 app.put('/api/admin/users/:id/status', async (req, res) => {
   try {
     const { id } = req.params;
