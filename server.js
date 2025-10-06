@@ -237,6 +237,21 @@ const getGripTypes = (machine) => {
   }
 };
 
+// ==========================================
+// RUTAS DEL PANEL DE ADMINISTRACIÓN
+// ==========================================
+
+// Importar rutas del panel
+const panelRoutes = require('./routes/panel');
+
+// Usar las rutas del panel
+app.use('/panel', panelRoutes);
+
+// Ruta para servir el panel de administración
+app.get('/panel', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'panel', 'index.html'));
+});
+
 // Rutas de autenticación
 app.post('/api/auth/register', async (req, res) => {
   try {

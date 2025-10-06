@@ -54,10 +54,8 @@ JWT_SECRET=tu_jwt_secret_muy_seguro
 # Crear la base de datos
 psql -U postgres -c "CREATE DATABASE gym_app;"
 
-# Ejecutar migraciones (si las tienes)
-npm run migrate
-
-# O importar el esquema manualmente
+# Ejecutar el script de configuración de la base de datos
+psql -U postgres -d gym_app -f database/setup.sql
 psql -U tu_usuario -d gym_app -f database/schema.sql
 ```
 
@@ -74,6 +72,42 @@ npm start
 ```
 
 El servidor estará disponible en `http://localhost:3001`
+
+## 🎛️ Panel de Administración
+
+### Acceso al Panel
+Una vez iniciado el servidor, accede al panel web en:
+```
+http://localhost:3001/panel
+```
+
+### Funcionalidades del Panel
+
+#### 🏋️ Gestión de Máquinas
+- **Ver todas las máquinas** con sus asociaciones de grupos musculares
+- **Editar máquinas**: Cambiar nombre, tipo y asociaciones
+- **Eliminar máquinas** (incluye todas sus asociaciones)
+- **Búsqueda en tiempo real** por nombre o grupo muscular
+
+#### 💪 Gestión de Grupos Musculares
+- **Crear nuevos grupos** con color personalizado
+- **Editar grupos existentes** (nombre, color)
+- **Ver cantidad** de máquinas asociadas por grupo
+- **Eliminar grupos** (incluye todas las asociaciones)
+
+#### 🔗 Gestión de Asociaciones
+- **Asociar/desasociar** máquinas con grupos musculares
+- **Vista de resumen** de todas las asociaciones
+- **Edición en tiempo real** desde la interfaz de máquinas
+
+### Grupos Musculares Predeterminados
+- **Pecho** (#FF6B6B) - Press, máquinas de pecho
+- **Espalda** (#4ECDC4) - Remo, jalones, poleas
+- **Piernas** (#45B7D1) - Prensa, extensiones, femoral
+- **Bíceps** (#FFEAA7) - Curl de bíceps
+- **Tríceps** (#FF9500) - Extensiones de tríceps
+- **Culo** (#E74C3C) - Sentadilla multipower, ejercicios de glúteos
+- **Pesas Libres** (#2ECC71) - Mancuernas, pesas
 
 ## 📁 Estructura del Proyecto
 
