@@ -3293,7 +3293,582 @@ app.listen(PORT, '0.0.0.0', async () => {
     } catch (error) {
       console.error('❌ Error creando tablas de entrenamientos:', error);
     }
+
+    // Crear tablas para sistema de XP y rankings
+    try {
+      // Crear tabla para estadísticas de usuarios
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS user_stats (
+          user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+          total_xp INTEGER DEFAULT 0,
+          level INTEGER DEFAULT 1,
+          total_workouts INTEGER DEFAULT 0,
+          total_weight_lifted DECIMAL(10,2) DEFAULT 0,
+          current_streak INTEGER DEFAULT 0,
+          longest_streak INTEGER DEFAULT 0,
+          last_workout_date DATE,
+          badges JSONB DEFAULT '[]',
+          privacy_show_in_rankings BOOLEAN DEFAULT true,
+          privacy_show_records BOOLEAN DEFAULT true,
+          privacy_show_workouts BOOLEAN DEFAULT true,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+
+      // Crear tabla para amistades
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS friendships (
+          id UUID PRIMARY KEY,
+          user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          friend_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          status VARCHAR(20) DEFAULT 'pending',
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          accepted_at TIMESTAMP,
+          UNIQUE(user_id, friend_id),
+          CHECK (user_id != friend_id),
+          CHECK (status IN ('pending', 'accepted', 'rejected', 'blocked'))
+        )
+      `);
+
+      // Crear tabla para historial de XP
+      await db.query(`
+        CREATE TABLE IF NOT EXISTS xp_history (
+          id UUID PRIMARY KEY,
+          user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          action VARCHAR(50) NOT NULL,
+          xp_gained INTEGER NOT NULL,
+          multiplier DECIMAL(3,2) DEFAULT 1.0,
+          description TEXT,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+
+      // Crear índices para mejorar rendimiento de rankings
+      await db.query(`
+        CREATE INDEX IF NOT EXISTS idx_user_stats_xp ON user_stats(total_xp DESC);
+        CREATE INDEX IF NOT EXISTS idx_user_stats_level ON user_stats(level DESC);
+        CREATE INDEX IF NOT EXISTS idx_user_stats_workouts ON user_stats(total_workouts DESC);
+        CREATE INDEX IF NOT EXISTS idx_user_stats_weight ON user_stats(total_weight_lifted DESC);
+        CREATE INDEX IF NOT EXISTS idx_user_stats_streak ON user_stats(current_streak DESC);
+        CREATE INDEX IF NOT EXISTS idx_friendships_user ON friendships(user_id);
+        CREATE INDEX IF NOT EXISTS idx_friendships_status ON friendships(status);
+        CREATE INDEX IF NOT EXISTS idx_xp_history_user ON xp_history(user_id, created_at DESC);
+      `);
+
+      console.log('✅ Tablas de XP y rankings creadas/verificadas correctamente');
+    } catch (error) {
+      console.error('❌ Error creando tablas de XP y rankings:', error);
+    }
+
+    // Añadir columnas a tabla users si no existen
+    try {
+      await db.query(`
+        ALTER TABLE users 
+        ADD COLUMN IF NOT EXISTS profile_picture VARCHAR(500),
+        ADD COLUMN IF NOT EXISTS bio TEXT,
+        ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT true,
+        ADD COLUMN IF NOT EXISTS last_active TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      `);
+      console.log('✅ Columnas de perfil añadidas a tabla users');
+    } catch (error) {
+      console.error('❌ Error añadiendo columnas a users:', error);
+    }
   } else {
     console.log('⚠️ Backend iniciado pero sin conexión a base de datos');
+  }
+});
+
+// ============================================
+// 🏆 RUTAS DE RANKINGS Y COMPETENCIA
+// ============================================
+
+// Obtener ranking global
+app.get('/api/rankings/global', async (req, res) => {
+  try {
+    const { metric = 'xp', limit = 100 } = req.query;
+    
+    let query = '';
+    let orderBy = '';
+    
+    switch (metric) {
+      case 'xp':
+        orderBy = 'user_stats.total_xp DESC';
+        break;
+      case 'workouts':
+        orderBy = 'user_stats.total_workouts DESC';
+        break;
+      case 'weight':
+        orderBy = 'user_stats.total_weight_lifted DESC';
+        break;
+      case 'streak':
+        orderBy = 'user_stats.current_streak DESC';
+        break;
+      case 'level':
+        orderBy = 'user_stats.level DESC, user_stats.total_xp DESC';
+        break;
+      default:
+        orderBy = 'user_stats.total_xp DESC';
+    }
+    
+    query = `
+      SELECT 
+        u.id,
+        u.username,
+        u.profile_picture,
+        COALESCE(us.total_xp, 0) as total_xp,
+        COALESCE(us.level, 1) as level,
+        COALESCE(us.total_workouts, 0) as total_workouts,
+        COALESCE(us.total_weight_lifted, 0) as total_weight_lifted,
+        COALESCE(us.current_streak, 0) as current_streak,
+        ROW_NUMBER() OVER (ORDER BY ${orderBy}) as rank
+      FROM users u
+      LEFT JOIN user_stats us ON u.id = us.user_id
+      WHERE u.is_active = true AND u.privacy_show_in_rankings = true
+      ORDER BY ${orderBy}
+      LIMIT $1
+    `;
+    
+    const result = await db.query(query, [parseInt(limit)]);
+    
+    res.json({
+      success: true,
+      rankings: result.rows,
+      metric,
+    });
+  } catch (error) {
+    console.error('Error fetching global ranking:', error);
+    res.status(500).json({ success: false, error: 'Error al obtener ranking' });
+  }
+});
+
+// Obtener ranking de amigos
+app.get('/api/rankings/friends/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { metric = 'xp' } = req.query;
+    
+    let orderBy = '';
+    switch (metric) {
+      case 'xp': orderBy = 'user_stats.total_xp DESC'; break;
+      case 'workouts': orderBy = 'user_stats.total_workouts DESC'; break;
+      case 'weight': orderBy = 'user_stats.total_weight_lifted DESC'; break;
+      case 'streak': orderBy = 'user_stats.current_streak DESC'; break;
+      default: orderBy = 'user_stats.total_xp DESC';
+    }
+    
+    const query = `
+      SELECT 
+        u.id,
+        u.username,
+        u.profile_picture,
+        COALESCE(us.total_xp, 0) as total_xp,
+        COALESCE(us.level, 1) as level,
+        COALESCE(us.total_workouts, 0) as total_workouts,
+        COALESCE(us.total_weight_lifted, 0) as total_weight_lifted,
+        COALESCE(us.current_streak, 0) as current_streak
+      FROM users u
+      LEFT JOIN user_stats us ON u.id = us.user_id
+      WHERE u.id IN (
+        SELECT friend_id FROM friendships WHERE user_id = $1 AND status = 'accepted'
+        UNION
+        SELECT user_id FROM friendships WHERE friend_id = $1 AND status = 'accepted'
+        UNION
+        SELECT $1::UUID
+      )
+      ORDER BY ${orderBy}
+    `;
+    
+    const result = await db.query(query, [userId]);
+    
+    res.json({
+      success: true,
+      rankings: result.rows,
+    });
+  } catch (error) {
+    console.error('Error fetching friends ranking:', error);
+    res.status(500).json({ success: false, error: 'Error al obtener ranking de amigos' });
+  }
+});
+
+// Obtener ranking por ejercicio
+app.get('/api/rankings/exercise/:exerciseName', async (req, res) => {
+  try {
+    const { exerciseName } = req.params;
+    const { limit = 50 } = req.query;
+    
+    const query = `
+      SELECT 
+        u.id,
+        u.username,
+        u.profile_picture,
+        MAX(wr.weight) as max_weight,
+        wr.reps,
+        wr.grip_type,
+        wr.date,
+        ROW_NUMBER() OVER (ORDER BY MAX(wr.weight) DESC) as rank
+      FROM weight_records wr
+      JOIN users u ON wr.user_id = u.id
+      WHERE wr.exercise_name = $1 AND u.privacy_show_records = true
+      GROUP BY u.id, u.username, u.profile_picture, wr.reps, wr.grip_type, wr.date
+      ORDER BY max_weight DESC
+      LIMIT $2
+    `;
+    
+    const result = await db.query(query, [exerciseName, parseInt(limit)]);
+    
+    res.json({
+      success: true,
+      rankings: result.rows,
+      exerciseName,
+    });
+  } catch (error) {
+    console.error('Error fetching exercise ranking:', error);
+    res.status(500).json({ success: false, error: 'Error al obtener ranking de ejercicio' });
+  }
+});
+
+// Obtener posición del usuario en rankings
+app.get('/api/rankings/user/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    // Ranking global de XP
+    const xpRankQuery = `
+      WITH ranked_users AS (
+        SELECT u.id, ROW_NUMBER() OVER (ORDER BY COALESCE(us.total_xp, 0) DESC) as rank
+        FROM users u
+        LEFT JOIN user_stats us ON u.id = us.user_id
+        WHERE u.is_active = true
+      )
+      SELECT rank FROM ranked_users WHERE id = $1
+    `;
+    const xpRank = await db.query(xpRankQuery, [userId]);
+    
+    // Ranking global de entrenamientos
+    const workoutsRankQuery = `
+      WITH ranked_users AS (
+        SELECT u.id, ROW_NUMBER() OVER (ORDER BY COALESCE(us.total_workouts, 0) DESC) as rank
+        FROM users u
+        LEFT JOIN user_stats us ON u.id = us.user_id
+        WHERE u.is_active = true
+      )
+      SELECT rank FROM ranked_users WHERE id = $1
+    `;
+    const workoutsRank = await db.query(workoutsRankQuery, [userId]);
+    
+    // Ejercicios donde está en top 10
+    const topExercisesQuery = `
+      WITH ranked_exercises AS (
+        SELECT 
+          exercise_name,
+          user_id,
+          MAX(weight) as max_weight,
+          ROW_NUMBER() OVER (PARTITION BY exercise_name ORDER BY MAX(weight) DESC) as rank
+        FROM weight_records
+        GROUP BY exercise_name, user_id
+      )
+      SELECT exercise_name, max_weight, rank
+      FROM ranked_exercises
+      WHERE user_id = $1 AND rank <= 10
+      ORDER BY rank
+    `;
+    const topExercises = await db.query(topExercisesQuery, [userId]);
+    
+    res.json({
+      success: true,
+      globalXPRank: xpRank.rows[0]?.rank || null,
+      globalWorkoutsRank: workoutsRank.rows[0]?.rank || null,
+      topExercises: topExercises.rows,
+    });
+  } catch (error) {
+    console.error('Error fetching user rankings:', error);
+    res.status(500).json({ success: false, error: 'Error al obtener rankings del usuario' });
+  }
+});
+
+// Comparar dos usuarios
+app.get('/api/rankings/compare', async (req, res) => {
+  try {
+    const { user1, user2 } = req.query;
+    
+    const query = `
+      SELECT 
+        u.id,
+        u.username,
+        u.profile_picture,
+        COALESCE(us.total_xp, 0) as total_xp,
+        COALESCE(us.level, 1) as level,
+        COALESCE(us.total_workouts, 0) as total_workouts,
+        COALESCE(us.total_weight_lifted, 0) as total_weight_lifted,
+        COALESCE(us.current_streak, 0) as current_streak
+      FROM users u
+      LEFT JOIN user_stats us ON u.id = us.user_id
+      WHERE u.id IN ($1, $2)
+    `;
+    
+    const result = await db.query(query, [user1, user2]);
+    
+    if (result.rows.length !== 2) {
+      return res.status(404).json({ success: false, error: 'Usuarios no encontrados' });
+    }
+    
+    res.json({
+      success: true,
+      user1: result.rows[0].id === user1 ? result.rows[0] : result.rows[1],
+      user2: result.rows[0].id === user2 ? result.rows[0] : result.rows[1],
+    });
+  } catch (error) {
+    console.error('Error comparing users:', error);
+    res.status(500).json({ success: false, error: 'Error al comparar usuarios' });
+  }
+});
+
+// ============================================
+// 🤝 RUTAS DE AMISTAD
+// ============================================
+
+// Enviar solicitud de amistad
+app.post('/api/friends/request', async (req, res) => {
+  try {
+    const { userId, friendUsername } = req.body;
+    
+    // Buscar usuario por username
+    const userResult = await db.query('SELECT id FROM users WHERE username = $1', [friendUsername]);
+    
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Usuario no encontrado' });
+    }
+    
+    const friendId = userResult.rows[0].id;
+    
+    if (userId === friendId) {
+      return res.status(400).json({ success: false, error: 'No puedes enviarte solicitud a ti mismo' });
+    }
+    
+    // Verificar si ya son amigos o hay solicitud pendiente
+    const existingResult = await db.query(
+      `SELECT * FROM friendships 
+       WHERE (user_id = $1 AND friend_id = $2) OR (user_id = $2 AND friend_id = $1)`,
+      [userId, friendId]
+    );
+    
+    if (existingResult.rows.length > 0) {
+      return res.status(400).json({ success: false, error: 'Ya existe una relación con este usuario' });
+    }
+    
+    // Crear solicitud
+    await db.query(
+      `INSERT INTO friendships (id, user_id, friend_id, status, created_at)
+       VALUES ($1, $2, $3, 'pending', NOW())`,
+      [uuidv4(), userId, friendId]
+    );
+    
+    res.json({ success: true, message: 'Solicitud enviada' });
+  } catch (error) {
+    console.error('Error sending friend request:', error);
+    res.status(500).json({ success: false, error: 'Error al enviar solicitud' });
+  }
+});
+
+// Aceptar solicitud de amistad
+app.post('/api/friends/accept', async (req, res) => {
+  try {
+    const { requestId } = req.body;
+    
+    await db.query(
+      `UPDATE friendships SET status = 'accepted', accepted_at = NOW() WHERE id = $1`,
+      [requestId]
+    );
+    
+    res.json({ success: true, message: 'Solicitud aceptada' });
+  } catch (error) {
+    console.error('Error accepting friend request:', error);
+    res.status(500).json({ success: false, error: 'Error al aceptar solicitud' });
+  }
+});
+
+// Obtener lista de amigos
+app.get('/api/friends/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    const query = `
+      SELECT 
+        u.id,
+        u.username,
+        u.profile_picture,
+        COALESCE(us.level, 1) as level,
+        COALESCE(us.total_xp, 0) as total_xp
+      FROM users u
+      LEFT JOIN user_stats us ON u.id = us.user_id
+      WHERE u.id IN (
+        SELECT friend_id FROM friendships WHERE user_id = $1 AND status = 'accepted'
+        UNION
+        SELECT user_id FROM friendships WHERE friend_id = $1 AND status = 'accepted'
+      )
+      ORDER BY u.username
+    `;
+    
+    const result = await db.query(query, [userId]);
+    
+    res.json({
+      success: true,
+      friends: result.rows,
+    });
+  } catch (error) {
+    console.error('Error fetching friends:', error);
+    res.status(500).json({ success: false, error: 'Error al obtener amigos' });
+  }
+});
+
+// Obtener solicitudes pendientes
+app.get('/api/friends/requests/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    
+    const query = `
+      SELECT 
+        f.id,
+        u.id as user_id,
+        u.username,
+        u.profile_picture,
+        f.created_at
+      FROM friendships f
+      JOIN users u ON f.user_id = u.id
+      WHERE f.friend_id = $1 AND f.status = 'pending'
+      ORDER BY f.created_at DESC
+    `;
+    
+    const result = await db.query(query, [userId]);
+    
+    res.json({
+      success: true,
+      requests: result.rows,
+    });
+  } catch (error) {
+    console.error('Error fetching friend requests:', error);
+    res.status(500).json({ success: false, error: 'Error al obtener solicitudes' });
+  }
+});
+
+// Actualizar configuración de privacidad
+app.put('/api/users/:userId/privacy', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { showInRankings, showRecords, showWorkouts } = req.body;
+    
+    await db.query(
+      `INSERT INTO user_stats (user_id, privacy_show_in_rankings, privacy_show_records, privacy_show_workouts)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (user_id) DO UPDATE SET
+        privacy_show_in_rankings = $2,
+        privacy_show_records = $3,
+        privacy_show_workouts = $4,
+        updated_at = NOW()`,
+      [userId, showInRankings, showRecords, showWorkouts]
+    );
+    
+    res.json({ success: true, message: 'Privacidad actualizada' });
+  } catch (error) {
+    console.error('Error updating privacy:', error);
+    res.status(500).json({ success: false, error: 'Error al actualizar privacidad' });
+  }
+});
+
+// Sincronizar estadísticas del usuario
+app.post('/api/users/:userId/stats/sync', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { totalXP, level, totalWorkouts, totalWeightLifted, currentStreak, longestStreak, badges } = req.body;
+    
+    // Crear o actualizar estadísticas
+    await db.query(
+      `INSERT INTO user_stats (
+        user_id, total_xp, level, total_workouts, total_weight_lifted, 
+        current_streak, longest_streak, badges, last_workout_date, updated_at
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CURRENT_DATE, NOW())
+      ON CONFLICT (user_id) DO UPDATE SET
+        total_xp = GREATEST(user_stats.total_xp, $2),
+        level = GREATEST(user_stats.level, $3),
+        total_workouts = GREATEST(user_stats.total_workouts, $4),
+        total_weight_lifted = GREATEST(user_stats.total_weight_lifted, $5),
+        current_streak = $6,
+        longest_streak = GREATEST(user_stats.longest_streak, $7),
+        badges = $8,
+        last_workout_date = CURRENT_DATE,
+        updated_at = NOW()`,
+      [userId, totalXP, level, totalWorkouts, totalWeightLifted, currentStreak, longestStreak, JSON.stringify(badges)]
+    );
+    
+    res.json({ success: true, message: 'Estadísticas sincronizadas' });
+  } catch (error) {
+    console.error('Error syncing stats:', error);
+    res.status(500).json({ success: false, error: 'Error al sincronizar estadísticas' });
+  }
+});
+
+// Añadir XP al usuario
+app.post('/api/users/:userId/xp/add', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { action, xpGained, multiplier, description } = req.body;
+    
+    // Registrar en historial de XP
+    await db.query(
+      `INSERT INTO xp_history (id, user_id, action, xp_gained, multiplier, description, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
+      [uuidv4(), userId, action, xpGained, multiplier || 1.0, description]
+    );
+    
+    // Actualizar total de XP
+    await db.query(
+      `INSERT INTO user_stats (user_id, total_xp, updated_at)
+       VALUES ($1, $2, NOW())
+       ON CONFLICT (user_id) DO UPDATE SET
+        total_xp = user_stats.total_xp + $2,
+        updated_at = NOW()`,
+      [userId, xpGained]
+    );
+    
+    // Obtener nuevo total
+    const result = await db.query(
+      `SELECT total_xp, level FROM user_stats WHERE user_id = $1`,
+      [userId]
+    );
+    
+    res.json({ 
+      success: true, 
+      totalXP: result.rows[0]?.total_xp || xpGained,
+      level: result.rows[0]?.level || 1
+    });
+  } catch (error) {
+    console.error('Error adding XP:', error);
+    res.status(500).json({ success: false, error: 'Error al añadir XP' });
+  }
+});
+
+// Obtener historial de XP
+app.get('/api/users/:userId/xp/history', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const limit = req.query.limit || 50;
+    
+    const result = await db.query(
+      `SELECT * FROM xp_history 
+       WHERE user_id = $1 
+       ORDER BY created_at DESC 
+       LIMIT $2`,
+      [userId, limit]
+    );
+    
+    res.json({
+      success: true,
+      history: result.rows,
+    });
+  } catch (error) {
+    console.error('Error fetching XP history:', error);
+    res.status(500).json({ success: false, error: 'Error al obtener historial' });
   }
 });
