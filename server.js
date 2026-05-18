@@ -360,6 +360,9 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
+// Catálogo de ejercicios (Free Exercise DB) — endpoints registrados en catalog.js
+require('./catalog').register(app, authenticateToken);
+
 // Rutas para registros de pesos
 app.get('/api/weight-records', authenticateToken, async (req, res) => {
   try {
